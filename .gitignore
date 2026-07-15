@@ -1,0 +1,11 @@
+# vendor binary (download from http://www.neje.club/download/NEJE_V4.2_EN.exe)
+*.exe
+# extracted IL / analysis scratch
+*.il
+# python venv for stcgal/dnfile
+venv/
+__pycache__/
+
+# claude local state
+.claude/settings.local.json
+.claude/*.tmp.*
