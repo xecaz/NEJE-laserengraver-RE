@@ -80,8 +80,9 @@ static void laser_off(void)
 
 static void laser_on(void)
 {
-    if (laser_mask & 1) LASER_G = 1;
-    if (laser_mask & 2) ENDC = 1;
+    FAN_G = 1;                  /* fume fan runs whenever the laser fires; */
+    if (laser_mask & 1) LASER_G = 1;   /* stays on until reset (FF 04) or */
+    if (laser_mask & 2) ENDC = 1;      /* explicit FF 26 00               */
     if (laser_mask & 4) LASER_T = 1;
 }
 
@@ -179,6 +180,7 @@ static void dispatch(const uint8_t *f)
     case 0x02:                       /* center / preview: not implemented */
     case 0x04:                       /* reset / all-off */
         laser_off();
+        FAN_G = 0;
         motors_off();
         send4(0x00, 0, 0);
         break;
@@ -193,8 +195,8 @@ static void dispatch(const uint8_t *f)
         aborted = do_pulse(f[2]);
         send4(aborted ? 0x0C : 0x00, 0, 0);
         break;
-    case 0x23:                       /* set step period */
-        if (f[2] >= 1 && f[2] <= 50)
+    case 0x23:                       /* set step period, 1..255 ms */
+        if (f[2] >= 1)
             step_ms = f[2];
         send4(0x00, step_ms, 0);
         break;

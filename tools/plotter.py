@@ -53,7 +53,10 @@ class Plotter:
             pass
 
     def speed(self, ms):
-        self.cmd(0x23, ms, 0)
+        r = self.cmd(0x23, ms, 0)
+        if r[2] != ms:   # firmware echoes the period actually in effect
+            raise IOError(f"firmware rejected step period {ms} ms "
+                          f"(still at {r[2]} ms)")
 
     def mask(self, m):
         self.cmd(0x25, m, 0)

@@ -65,24 +65,32 @@ LED blink. Verified end-to-end: serial, motion, and laser cutting all work
 multi-pass).
 
 `tools/plotter.py` is the host driver: `move`/`pulse`/`mask`/`speed`/`circle`
-subcommands, ack-paced, always sends reset (laser off) on exit.
+subcommands, ack-paced, always sends reset (laser off) on exit. `speed()`
+verifies the firmware's echoed period — a rejected value once silently ran a
+whole job at travel speed.
 `tools/write_text.py` engraves single-stroke vector text on top of it
 (unit-box glyph table `GLYPHS`, extend as needed; `--flip-x/--flip-y` for
 mirrored axes — this unit needs neither: X+ = right, Y+ = up as the user
-faces the machine). First text 2026-07-17: "Chr1x.com", 25 mm / 4 mm caps
-on paper.
+faces the machine).
+`tools/etch_image.py` engraves bitmaps, two modes: `raster` (scanline rows —
+for filled art/photos) and `outline` (Zhang-Suen thinning to centerlines,
+each stroke traced continuously — for line art). Raster on line art comes
+out as twitchy dashes; use outline. Thin antialiased strokes need
+`--threshold 200`. The etch starts at the current head position (top-left
+of image, extends right+down) and parks back there, so reruns overlay
+exactly.
 
-**Deployed-firmware caveat:** the board currently runs the build WITHOUT the
-`FF 26` fan command and watchdog (that flash attempt failed when the CH340
-dropped off the bus; the repo source includes both). Reflash pending —
-until then fan control and hang-self-reset are absent on the device.
+The board runs the latest build (auto-fan: fume fan starts with the laser,
+stops on `FF 04` reset; `FF 26` manual override; watchdog; step period
+1–255 ms).
 
 **Calibration (measured):** 6.75 full steps/mm (0.148 mm/step); X travel
 ≈ 38 mm ≈ 256 steps, no endstops — running into the frame stalls audibly but
 harmlessly. Laser fires with mask bit0 (LASER_G power FET, module on J9);
 default mask 5 works. Cardboard cutting: feed 50 ms/step, ~10 passes per
-1.5 mm of depth. Paper marking: 20 ms/step gives a clear dark line, 35 ms
-darker still — always do a short test stroke first, paper chars easily.
+1.5 mm of depth. Paper marking: 20 ms/step = clear dark line on white paper;
+yellow post-its need much more dwell — 80 ms/step gives good contrast.
+Always do a short test stroke first; paper chars easily.
 
 **Safety rule:** before ANY firing command, re-confirm the workpiece is
 loaded and the user is watching — users remove the piece to inspect between

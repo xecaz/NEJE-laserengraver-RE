@@ -12,3 +12,5 @@ __pycache__/
 tools/sdcc/
 tools/venv/
 firmware/build/
+# result photos
+IMG_*.jpg
