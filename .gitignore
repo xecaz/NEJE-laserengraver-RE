@@ -9,3 +9,6 @@ __pycache__/
 # claude local state
 .claude/settings.local.json
 .claude/*.tmp.*
+tools/sdcc/
+tools/venv/
+firmware/build/

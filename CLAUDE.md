@@ -42,19 +42,72 @@ Legacy single-byte protocol (older green-board NEJEs, documented by
 `alexkuklin/neje-engraver`): `0xF1` start, `0xF2` pause, `0xF3` home,
 `0xF5..0xF8` jog, `0xF9` reset, `0xFEx8` erase+upload. This unit is **not** that.
 
-## Current status / open question
+## Current status
 
-**The unit answers nothing.** No reply to `FF 09 00 00` (or any command) at any
-baud, DTR high or low; no physical motion on jog; solid power LED, head stays
-put. Yet `stcgal` reaches the STC8 ISP bootloader after a power-cycle — so the
-device→PC serial path physically works. The running application firmware is
-either unresponsive/half-flashed or faulted. This matches the widely-reported
-"NEJE verify fails" symptom where NEJE changed protocol in 2017 and newer apps
-can't verify certain boards. Next avenues:
-1. Confirm the app firmware actually runs (scope the MCU TX pin on power-up, or
-   dump code flash via `stcgal` read — non-destructive).
-2. Try the "NEJE Laser Engraver Extended" legacy path end-to-end.
-3. Verify DC power rail actually reaches the motor drivers (TC118S) under load.
+**Running custom firmware (`firmware/`).** The original app firmware was
+confirmed dead 2026-07-17: total serial silence at every baud/DTR/RTS combo,
+no boot banner across a monitored power-cycle, no motion on either protocol's
+jog commands — while the ISP bootloader answered fine on the same wires (also
+under USB power, so the supply was never the problem). STC ISP cannot read
+code flash back, so the dead firmware was unrecoverable; it was erased and
+replaced with our own.
+
+`firmware/main.c` (SDCC, ~1.1 KB) implements the v3 protocol subset — identify
+`FF 09 00 00` → `FF 02 0B 02` (production V2.0), four jogs, reset — plus
+host-driven plotter primitives (see the header comment for the full table):
+`FF 21 <flags> <n>` burn-move (dir + optional laser), `FF 22` stationary
+pulse, `FF 23` step period, `FF 25` laser line mask, `FF 26` fan. The laser
+is only energized inside an executing 0x21/0x22 command — no command can
+latch it on. Board button = e-stop (aborts, acks `FF 0C`). Hardware watchdog
+(~4.2 s) resets the MCU on hang, which drops all outputs. Boot banner + idle
+LED blink. Verified end-to-end: serial, motion, and laser cutting all work
+(first successful cut 2026-07-17: 8 mm circle through 3 mm cardboard,
+multi-pass).
+
+`tools/plotter.py` is the host driver: `move`/`pulse`/`mask`/`speed`/`circle`
+subcommands, ack-paced, always sends reset (laser off) on exit.
+
+**Calibration (measured):** 6.75 full steps/mm (0.148 mm/step); X travel
+≈ 38 mm ≈ 256 steps, no endstops — running into the frame stalls audibly but
+harmlessly. Laser fires with mask bit0 (LASER_G power FET, module on J9);
+default mask 5 works. Cardboard cutting: feed 50 ms/step, ~10 passes per
+1.5 mm of depth.
+
+**Safety rule:** before ANY firing command, re-confirm the workpiece is
+loaded and the user is watching — users remove the piece to inspect between
+runs. A user-side power cut mid-run looks exactly like an MCU hang (missing
+ack, then silence); ask before diagnosing.
+
+### Pin map (from vrbadev schematic, `eagle/NEJE-KZ-board.sch` nets)
+
+| Pin | Net | Role |
+|-----|-----|------|
+| P0.0–P0.3 | MOTX INB1/INA1/INB2/INA2 | X stepper — IC6 coil A, IC7 coil B (TC118S) |
+| P0.4–P0.7 | MOTY INB1/INA1/INB2/INA2 | Y stepper — IC9 coil A, IC8 coil B |
+| P3.0/P3.1 | RX/TX | UART1 ↔ CH340 |
+| P3.4 | DTR# | CH340 DTR |
+| P1.6 | ENDC | TX4223 boost enable (laser supply), 270R pulldown |
+| P2.0 | LASER_G | laser power N-FET gate, 3k3 pulldown |
+| P1.7 | LASER_T | laser TTL, 10k pulldown |
+| P4.0 / P4.4 | LED1 / FAN_G | status LED (high=on) / fan gate |
+| P5.5 / P1.3 | BTN / SW_LED | button (low=pressed) / LED connector |
+
+TC118S: INA=1,INB=0 fwd · 0,1 rev · 0,0 coast · 1,1 brake. Full-step nibble
+sequence `0A 09 05 06`.
+
+### Build & flash
+
+`cd firmware && make && make flash` — SDCC lives in `tools/sdcc/` (binary
+install, not committed), stcgal in `tools/venv/`. Flashing trims the IRC to
+**24 MHz** (`-t 24000`); UART timing depends on it. Device must be
+power-cycled when stcgal prompts.
+
+### Next
+
+1. Confirm/tune physical jog motion (direction mapping, step rate `STEP_MS`,
+   `JOG_STEPS`).
+2. Extend protocol: absolute moves, position reports (`0x03`/`0x04`).
+3. Laser control — only with explicit user setup/supervision, hard-gated.
 
 ## Tools
 
