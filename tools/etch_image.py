@@ -135,6 +135,9 @@ def outline_main(a):
                     laser=laser, step_ms=ms)
         cx, cy = tx, ty
     try:
+        if a.home:
+            print("homing (stall into top-left corner)")
+            pl.home(a.home_margin)
         # greedy nearest-first stroke order to minimize travel
         remaining = list(paths)
         while remaining:
@@ -167,6 +170,12 @@ def main():
                     help="raster: scanline rows (filled art/photos); "
                          "outline: thin to centerlines and trace each stroke "
                          "continuously (line art)")
+    ap.add_argument("--home", action=argparse.BooleanOptionalAction, default=True,
+                    help="stall-home to the top-left corner first so the "
+                         "image lands at an absolute, repeatable position "
+                         "(--no-home: start at the current head position)")
+    ap.add_argument("--home-margin", type=int, default=8,
+                    help="steps to back off the corner after homing")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
 
@@ -191,6 +200,9 @@ def main():
     pl = Plotter(a.port)
     x = 0                     # current head x, in steps from image left
     try:
+        if a.home:
+            print("homing (stall into top-left corner)")
+            pl.home(a.home_margin)
         for y, runs in enumerate(rows):
             if y % max(1, h // 10) == 0:
                 print(f"  row {y}/{h}")

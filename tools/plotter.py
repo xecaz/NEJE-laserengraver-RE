@@ -6,6 +6,7 @@ pulses, everything acked. The laser is only on inside an executing command
 and the board button is an emergency stop (ack 0x0C).
 
 Subcommands:
+  home  [--margin N]                       stall-home to the top-left corner
   move  --dir u|d|l|r --steps N            travel, laser OFF (calibration)
   pulse --ms N                             stationary laser pulse (10ms units)
   mask  --value N                          laser lines: 1=LASER_G 2=ENDC 4=LASER_T
@@ -18,6 +19,7 @@ import serial
 
 DIRS = {"u": 0, "d": 1, "l": 2, "r": 3}   # firmware dir codes (0x21 flags)
 LASER_BIT = 4
+HOME_OVERTRAVEL = 300   # steps, > full axis travel (~256), guarantees the stall
 
 class Plotter:
     def __init__(self, port="/dev/ttyUSB0"):
@@ -61,6 +63,18 @@ class Plotter:
     def mask(self, m):
         self.cmd(0x25, m, 0)
 
+    def home(self, margin=8, overtravel=HOME_OVERTRAVEL, step_ms=3):
+        """Stall-home to the top-left corner (X min, Y max). No endstops:
+        drive past the frame limit — the stepper stalls audibly but
+        harmlessly against the frame — then back off `margin` steps so the
+        head sits free at a repeatable absolute origin."""
+        self.speed(step_ms)
+        self.move(DIRS["l"], overtravel, laser=False, step_ms=step_ms)
+        self.move(DIRS["u"], overtravel, laser=False, step_ms=step_ms)
+        if margin:
+            self.move(DIRS["r"], margin, laser=False, step_ms=step_ms)
+            self.move(DIRS["d"], margin, laser=False, step_ms=step_ms)
+
     def move(self, dir_code, steps, laser=False, step_ms=2):
         """Move up to 255 steps per frame; laser optionally on throughout."""
         while steps > 0:
@@ -98,6 +112,11 @@ def main():
     ap.add_argument("--port", default="/dev/ttyUSB0")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
+    hm = sub.add_parser("home")
+    hm.add_argument("--margin", type=int, default=8,
+                    help="steps to back off the corner after the stall")
+    hm.add_argument("--overtravel", type=int, default=HOME_OVERTRAVEL)
+    hm.add_argument("--step-ms", type=int, default=3)
     m = sub.add_parser("move");  m.add_argument("--dir", choices="udlr", required=True)
     m.add_argument("--steps", type=int, required=True)
     p = sub.add_parser("pulse"); p.add_argument("--ms", type=int, required=True)
@@ -113,7 +132,10 @@ def main():
 
     pl = Plotter(a.port)
     try:
-        if a.cmd == "move":
+        if a.cmd == "home":
+            pl.home(a.margin, a.overtravel, a.step_ms)
+            print(f"homed: top-left corner + {a.margin} steps margin")
+        elif a.cmd == "move":
             pl.speed(2)
             pl.move(DIRS[a.dir], a.steps, laser=False)
             print(f"moved {a.steps} steps {a.dir}")

@@ -5,8 +5,11 @@ Uses plotter.py's Plotter. Glyphs are polylines in a unit box (y up,
 baseline 0, cap height 1.0, x-height 0.55, advance 0.7). Only the glyphs
 needed so far are defined — extend GLYPHS as required.
 
-The head must START at the BOTTOM-LEFT of the text area. X+ is 'r', Y+ is
-'u' (flip with --flip-x/--flip-y if the machine's axes are mirrored).
+By default the head stall-homes to the machine's top-left corner first and
+drops down by the cap height, so the text lands at an absolute, repeatable
+position. With --no-home the head must START at the BOTTOM-LEFT of the text
+area. X+ is 'r', Y+ is 'u' (flip with --flip-x/--flip-y if the machine's
+axes are mirrored).
 
   write_text.py --text "Chr1x.com" --length-mm 25 --steps-per-mm 6.75 \
                 --feed-ms 20 [--dry-run]
@@ -103,6 +106,12 @@ def main():
     ap.add_argument("--feed-ms", type=int, default=20)
     ap.add_argument("--flip-x", action="store_true")
     ap.add_argument("--flip-y", action="store_true")
+    ap.add_argument("--home", action=argparse.BooleanOptionalAction, default=True,
+                    help="stall-home to the top-left corner, then drop by the "
+                         "cap height so the text lands at an absolute position "
+                         "(--no-home: start at the current head position)")
+    ap.add_argument("--home-margin", type=int, default=8,
+                    help="steps to back off the corner after homing")
     ap.add_argument("--dry-run", action="store_true",
                     help="compute and print extents, move nothing")
     a = ap.parse_args()
@@ -119,6 +128,11 @@ def main():
 
     pl = Plotter(a.port)
     try:
+        if a.home:
+            print("homing (stall into top-left corner)")
+            pl.home(a.home_margin)
+            pl.speed(2)
+            pl.move(DIRS["d"], h + 2, laser=False, step_ms=2)  # room for caps
         pl.speed(a.feed_ms)
         tw = TextWriter(pl, flip_x=a.flip_x, flip_y=a.flip_y)
         tw.write(a.text, scale)

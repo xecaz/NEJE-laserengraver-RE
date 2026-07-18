@@ -64,10 +64,15 @@ LED blink. Verified end-to-end: serial, motion, and laser cutting all work
 (first successful cut 2026-07-17: 8 mm circle through 3 mm cardboard,
 multi-pass).
 
-`tools/plotter.py` is the host driver: `move`/`pulse`/`mask`/`speed`/`circle`
-subcommands, ack-paced, always sends reset (laser off) on exit. `speed()`
-verifies the firmware's echoed period — a rejected value once silently ran a
-whole job at travel speed.
+`tools/plotter.py` is the host driver: `home`/`move`/`pulse`/`mask`/`speed`/
+`circle` subcommands, ack-paced, always sends reset (laser off) on exit.
+`speed()` verifies the firmware's echoed period — a rejected value once
+silently ran a whole job at travel speed.
+`home()` stall-homes: no endstops, so it drives 300 steps left then up —
+the head grinds audibly-but-harmlessly into the top-left corner — then
+backs off a margin (default 8 steps). Gives a repeatable absolute origin;
+both engraving tools home by default (`--no-home` to start at the current
+head position instead).
 `tools/write_text.py` engraves single-stroke vector text on top of it
 (unit-box glyph table `GLYPHS`, extend as needed; `--flip-x/--flip-y` for
 mirrored axes — this unit needs neither: X+ = right, Y+ = up as the user
@@ -76,9 +81,11 @@ faces the machine).
 for filled art/photos) and `outline` (Zhang-Suen thinning to centerlines,
 each stroke traced continuously — for line art). Raster on line art comes
 out as twitchy dashes; use outline. Thin antialiased strokes need
-`--threshold 200`. The etch starts at the current head position (top-left
-of image, extends right+down) and parks back there, so reruns overlay
-exactly.
+`--threshold 200`. The etch homes first by default, so the
+image lands at an absolute machine position (top-left of image at the home
+margin, extends right+down) and parks back at the image origin; reruns
+overlay exactly even across power cycles. `--no-home` reverts to
+current-head-position origin.
 
 The board runs the latest build (auto-fan: fume fan starts with the laser,
 stops on `FF 04` reset; `FF 26` manual override; watchdog; step period
