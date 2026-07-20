@@ -130,10 +130,10 @@ power-cycled when stcgal prompts.
 
 ### Next
 
-1. Confirm/tune physical jog motion (direction mapping, step rate `STEP_MS`,
-   `JOG_STEPS`).
-2. Extend protocol: absolute moves, position reports (`0x03`/`0x04`).
-3. Laser control — only with explicit user setup/supervision, hard-gated.
+1. Host-side position tracking so `home()` can skip most of the corner
+   grind when the head position is already known.
+2. Extend protocol: absolute moves, position reports.
+3. More glyphs in `write_text.py`'s `GLYPHS` as needed.
 
 ## Tools
 

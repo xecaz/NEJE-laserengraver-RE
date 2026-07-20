@@ -1,11 +1,37 @@
 # tools
 
-All scripts target `/dev/ttyUSB0`. Need `pyserial`; `dump_serial.py` also needs
-`dnfile` + `dncil`; bootloader work needs `stcgal`.
+All scripts target `/dev/ttyUSB0`. Need `pyserial`; `etch_image.py` also needs
+`Pillow`; `dump_serial.py` needs `dnfile` + `dncil`; bootloader work needs
+`stcgal`.
 
 ```sh
-python3 -m venv venv && ./venv/bin/pip install pyserial dnfile dncil stcgal
+python3 -m venv venv && ./venv/bin/pip install pyserial pillow dnfile dncil stcgal
 ```
+
+## Driving the machine (custom firmware)
+
+- **plotter.py** — host driver for the replacement firmware. Subcommands:
+  `home` (stall-home to the top-left corner — no endstops, it grinds
+  harmlessly into the frame and backs off a margin), `move`, `pulse`,
+  `mask`, `speed`, `circle`. Every command is acked; exit always sends
+  reset (laser off, motors released).
+- **write_text.py** — single-stroke vector text. Homes by default, then
+  drops down by the cap height. Extend the `GLYPHS` table as needed.
+  ```sh
+  python3 write_text.py --text "Chr1x.com" --length-mm 25 --feed-ms 20
+  ```
+- **etch_image.py** — bitmap engraving, two modes: `raster` (scanline rows,
+  for filled art/photos) and `outline` (Zhang-Suen thinning to centerlines,
+  each stroke traced continuously — use this for line art). Homes by
+  default so reruns land identically; `--dry-run` prints an ASCII preview.
+  ```sh
+  python3 etch_image.py --image logo.png --width-mm 30 --mode outline --dry-run
+  ```
+
+Calibration on this unit: 6.75 steps/mm; paper marks at 20 ms/step,
+cardboard cuts at 50 ms/step × ~10 passes per 1.5 mm.
+
+## Probing / reverse-engineering (kept for reference)
 
 - **handshake.py** — open 57600/DTR-high, send `FF 09 00 00`, parse replies.
 - **jog_dtr.py** — connect then jog the head (laser-off motion only).
